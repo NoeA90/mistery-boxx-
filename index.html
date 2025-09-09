@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>BET300 · Cofres</title>
+<meta name="theme-color" content="#064420"/>
+<style>
+:root{
+  /* 🎰 Tema verde casino (solo estética) */
+  --bg:#064420; 
+  --panel:#0d2b1b; 
+  --panel2:#0b2416; 
+  --border:#145c39;
+  --text:#e8ebff; --muted:#cdd3e9; --ok:#25D366; --accent:#ff9e2a; --pointer:#22d3ee;
+}
+*{box-sizing:border-box} html,body{height:100%}
+body{margin:0;color:var(--text);background:var(--bg);font:16px/1.35 system-ui,-apple-system,Segoe UI,Roboto}
+body::before{
+  content:"";position:fixed;inset:0;z-index:-2;
+  background: radial-gradient(900px 500px at 50% -10%, rgba(255,215,0,.22), transparent),
+              radial-gradient(700px 350px at 100% 0%, rgba(6,68,32,.22), transparent),
+              linear-gradient(180deg,#064420 0%,#043d1a 60%,#022f12 100%);
+}
+
+/* ===== Layout ===== */
+.container{max-width:1100px;margin:14px auto;padding:0 14px 92px}
+.card{
+  background: radial-gradient(120% 100% at 50% 0%, rgba(255,255,255,.05), transparent), var(--panel2);
+  border:1px solid var(--border);border-radius:18px;padding:18px;box-shadow:0 15px 40px rgba(0,0,0,.45)
+}
+@media(max-width:640px){.container{padding:0 0 92px}.card{border-radius:0;border-left:0;border-right:0}}
+
+.head{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
+.brand{
+  padding:8px 16px;border-radius:14px;font-weight:900;font-size:22px;letter-spacing:.5px;color:#0b0f1e;
+  background:linear-gradient(90deg,#ffd166,#ff9e2a);border:1px solid #ffb760;box-shadow:0 8px 20px rgba(255,158,42,.25)
+}
+.pill{
+  background:linear-gradient(90deg,rgba(255,255,255,.15),rgba(255,255,255,.10));
+  border:1px solid var(--border); border-radius:999px;padding:6px 10px;font-size:12px;color:#e6e9f6
+}
+.pill.time{display:flex;gap:8px;align-items:center}
+.count{
+  display:inline-flex;gap:6px;align-items:center;padding:4px 8px;border-radius:999px;
+  background:rgba(255,204,0,.15); border:1px solid rgba(255,204,0,.35);
+  color:#ffe27a;font-weight:700;font-variant-numeric:tabular-nums
+}
+
+.grid{display:grid;gap:16px;grid-template-columns:1.2fr .8fr}
+@media(max-width:980px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:16px}
+
+h1,h2,h3,p{margin:0 0 8px} h1{font-size:26px} .muted{color:var(--muted)}
+.stat{display:flex;gap:12px;align-items:center;justify-content:flex-start;margin:8px 0 14px}
+.badge{
+  min-width:86px;height:50px;border-radius:12px;
+  background:radial-gradient(100% 100% at 50% 0%, rgba(0,209,255,.25), rgba(124,77,255,.25));
+  display:grid;place-items:center;font-weight:800;font-size:18px;box-shadow:inset 0 0 10px rgba(124,77,255,.25)
+}
+
+/* ===== Cofres: tablero ===== */
+.board{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:10px}
+@media (max-width:520px){.board{gap:12px}}
+
+.chest{
+  position:relative; height:156px; border-radius:20px; cursor:pointer; overflow:hidden;
+  background:
+    radial-gradient(120% 90% at 50% -40%, rgba(255,255,255,.20), transparent 55%),
+    radial-gradient(160% 120% at 50% 120%, rgba(0,0,0,.35), transparent 60%),
+    linear-gradient(#223a2f,#223a2f) center 44%/100% 16px no-repeat,
+    linear-gradient(#223a2f,#223a2f) center 70%/100% 16px no-repeat,
+    linear-gradient(180deg,#27523f 0%,#1b3a2b 50%,#132a20 100%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.06) 0 1px, rgba(255,255,255,0) 1px 5px);
+  border:1px solid #2a5a40;
+  box-shadow: inset 0 22px 36px rgba(255,255,255,.06), inset 0 -30px 40px rgba(0,0,0,.35), 0 12px 26px rgba(0,0,0,.35);
+  display:grid; place-items:center;
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+.chest:hover{ transform:translateY(-2px); box-shadow: inset 0 22px 36px rgba(255,255,255,.06), inset 0 -30px 40px rgba(0,0,0,.35), 0 16px 32px rgba(0,0,0,.42) }
+.chest:active{ transform:translateY(0) scale(.99) }
+
+/* Tapa / base con bisel */
+.chest::before, .chest::after{
+  content:""; position:absolute; left:0; right:0; height:18px; pointer-events:none;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,0)),
+    linear-gradient(180deg, #2d5e44, #1f4a35);
+  border-top:1px solid #4e8a6a; border-bottom:1px solid #0d291c; opacity:.9;
+}
+.chest::before{ top:18px; border-radius:18px 18px 0 0 }
+.chest::after{ bottom:14px; border-radius:0 0 18px 18px; background:
+    linear-gradient(0deg, rgba(255,255,255,.14), rgba(255,255,255,0)),
+    linear-gradient(180deg, #2d5e44, #1f4a35) }
+
+/* Remaches en esquinas y bandas */
+.chest .rivet{ position:absolute; width:10px; height:10px; border-radius:50%;
+  background:radial-gradient(circle at 30% 30%, #ffffffaa 0 25%, #dbe7d8 26% 55%, #547a63 56% 100%);
+  box-shadow: inset 0 1px 1px rgba(0,0,0,.25)
+}
+.chest .rivet.tl{ left:12px; top:12px } .chest .rivet.tr{ right:12px; top:12px }
+.chest .rivet.bl{ left:12px; bottom:12px } .chest .rivet.br{ right:12px; bottom:12px }
+.chest .rivet.b1l{ left:18px; top:calc(44% - 5px) } .chest .rivet.b1r{ right:18px; top:calc(44% - 5px) }
+.chest .rivet.b2l{ left:18px; top:calc(70% - 5px) } .chest .rivet.b2r{ right:18px; top:calc(70% - 5px) }
+
+/* Candado dorado con arco */
+.lock{
+  position:absolute; top:32px; width:74px; height:92px; border-radius:16px;
+  background: linear-gradient(180deg,#f6e2ad 0%,#e9c476 40%,#caa157 100%);
+  box-shadow: 0 6px 16px rgba(0,0,0,.35), inset 0 2px 0 rgba(255,255,255,.45);
+  z-index:2; display:grid; place-items:center;
+  border:1px solid #8f6a33;
+}
+.lock::before{
+  content:""; position:absolute; top:-20px; width:48px; height:38px; border-radius:16px 16px 0 0;
+  border:6px solid #e6d39b; border-bottom:none; box-shadow:inset 0 0 0 2px #b8a26c;
+}
+.lock::after{
+  content:""; width:26px; height:26px; border-radius:8px;
+  background: radial-gradient(circle at 50% 42%, #1c1408 0 26%, transparent 27%), linear-gradient(#1c1408,#1c1408);
+  background-size: 100% 100%, 22% 42%; background-repeat:no-repeat; background-position: center, 50% 70%;
+  filter: drop-shadow(0 1px 0 rgba(0,0,0,.35));
+}
+
+/* Etiqueta de premio */
+.prize{
+  position:absolute; left:12px; right:12px; bottom:12px; height:46px;
+  display:flex; align-items:center; justify-content:center;
+  border-radius:12px; font-weight:900; color:#0f132b;
+  background:linear-gradient(90deg,#ffdcae,#ff9fb9);
+  border:1px solid #00000022; box-shadow:0 6px 16px rgba(0,0,0,.35);
+  opacity:0; transform:translateY(10px); pointer-events:none; z-index:3
+}
+.chest.open .prize{ opacity:1; transform:translateY(0); transition:opacity .28s ease, transform .28s ease }
+.chest.open .lock{ display:none }
+
+/* ===== Lateral derecho ===== */
+.side .cta{margin-top:12px}
+.btn{
+  appearance:none;border:none;cursor:pointer;padding:14px 16px;border-radius:14px;font-weight:800;
+  background:linear-gradient(90deg,#6c59ff,#00d1ff);color:#0a1020;width:100%;
+  box-shadow:0 8px 20px rgba(0,0,0,.35)
+}
+.btn.ok{background:#25D366;color:#0b0f1e}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+
+/* Dock fija en mobile */
+.dock{
+  position:fixed;left:0;right:0;bottom:0;z-index:20;
+  background:linear-gradient(180deg, rgba(6,32,16,0) 0%, rgba(6,32,16,.85) 22%, rgba(6,32,16,.95) 100%);
+  padding:10px 16px 14px;display:none;gap:12px;align-items:center
+}
+@media(max-width:980px){.dock{display:flex}}
+
+/* ===== Modal premio ===== */
+.modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:40}
+.modal.show{display:flex}
+.modal .backdrop{position:absolute;inset:0;background:rgba(8,28,16,.78);backdrop-filter:blur(8px)}
+.modal .box{
+  position:relative; width:min(540px,92vw); border-radius:20px; padding:22px 18px;
+  background: radial-gradient(120% 120% at 50% -20%, rgba(255,231,170,.18), transparent 60%), var(--panel);
+  border:1px solid var(--border); box-shadow:0 20px 60px rgba(0,0,0,.55), inset 0 0 0 1px rgba(255,255,255,.04);
+  animation: pop .22s ease-out
+}
+@keyframes pop{ from{ transform:scale(.94); opacity:.6 } to{ transform:scale(1); opacity:1 } }
+.winTitle{font-size:26px;margin:0 0 6px;display:flex;align-items:center;gap:10px}
+.winBadge{
+  display:inline-grid;place-items:center;min-width:88px;height:48px;border-radius:12px;font-weight:900;color:#0b0f1e;
+  background:linear-gradient(90deg,#ffd166,#ff9e2a);border:1px solid #ffb760;box-shadow:0 8px 20px rgba(255,158,42,.25)
+}
+.winMsg{color:var(--muted);margin-bottom:14px}
+.modal .row{display:flex;gap:10px}
+.modal .row .btn{flex:1}
+.modal .closeX{position:absolute;right:10px;top:10px;background:transparent;border:none;color:var(--muted);font-size:22px;cursor:pointer}
+
+/* Confetti */
+.confetti{pointer-events:none;position:absolute;inset:0;overflow:hidden;border-radius:20px}
+.confetti i{position:absolute;top:-10px;width:10px;height:16px;opacity:.9;transform:translateY(-120px) rotate(0deg)}
+@keyframes fall{ to { transform: translateY(120vh) rotate(360deg) } }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="card">
+
+    <div class="head">
+      <div class="brand">BET300</div>
+      <span class="pill">Promo interactiva</span>
+      <span class="pill">Abrís 1 cofre por día</span>
+      <span class="pill time">⏳ Tiempo limitado <span class="count" id="countdown">--:--</span></span>
+    </div>
+
+    <div class="grid">
+      <!-- tablero -->
+      <div class="panel">
+        <h1>Elegí tu cofre metálico</h1>
+        <p class="muted">Abrí uno para revelar tu beneficio</p>
+
+        <div id="board" class="board">
+          <!-- 6 cofres (se crean por JS) -->
+        </div>
+      </div>
+
+      <!-- lateral derecho -->
+      <div class="panel side">
+        <div class="stat">
+          <div class="badge" id="badge">-</div>
+          <div>
+            <h2 id="title" style="margin:0">Tenés 1 apertura disponible</h2>
+            <p id="subtitle" class="muted">Los premios se acreditan con tu <b>próxima carga mínima</b>.</p>
+          </div>
+        </div>
+
+        <div class="cta">
+          <button id="claimBtn" class="btn ok" disabled>📲 Reclamar por WhatsApp</button>
+        </div>
+
+        <div class="cta">
+          <a id="playNow" class="btn" target="_blank" rel="noopener">🎮 Entrar a la plataforma</a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Dock mobile -->
+<div class="dock">
+  <button id="claimBtnDock" class="btn ok" disabled>📲 Reclamar</button>
+  <a id="playNowDock" class="btn" target="_blank" rel="noopener">🎮 Plataforma</a>
+</div>
+
+<!-- Modal premio -->
+<div id="winModal" class="modal" aria-hidden="true">
+  <div class="backdrop"></div>
+  <div class="box">
+    <button class="closeX" id="closeModal" aria-label="Cerrar">✖</button>
+    <div class="confetti" id="confetti"></div>
+    <h3 class="winTitle">🎉 ¡Premio obtenido! <span class="winBadge" id="winAmount">$0</span></h3>
+    <p class="winMsg" id="winText">Recibís un extra con tu próxima carga.</p>
+    <div class="row" style="margin-top:10px">
+      <button id="claimBtnModal" class="btn ok">📲 Reclamar por WhatsApp</button>
+      <a id="playNowModal" class="btn" target="_blank" rel="noopener">🎮 Entrar</a>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ===== Premios (6 montos) ===== */
+const PRIZES = [2000, 3000, 4000, 5000, 7000, 10000];
+
+/* ===== WhatsApp / plataforma por PC ===== */
+const WP_NUMBERS = { principal:"5491157737173", pc1:"5493814657665", pc2:"5491138214312", pc3:"5491168392647" };
+const PLATFORM_LINKS = { principal:"https://plataforma.example/inicio", pc1:"https://c01.bet300vip.com/", pc2:"https://c02.bet300vip.com/", pc3:"https://c03.bet300vip.com/" };
+const params = new URLSearchParams(location.search);
+const pc = params.get('pc');
+let WP = WP_NUMBERS.principal, PLATFORM = PLATFORM_LINKS.principal;
+if(pc==='1'){ WP=WP_NUMBERS.pc1; PLATFORM=PLATFORM_LINKS.pc1; }
+if(pc==='2'){ WP=WP_NUMBERS.pc2; PLATFORM=PLATFORM_LINKS.pc2; }
+if(pc==='3'){ WP=WP_NUMBERS.pc3; PLATFORM=PLATFORM_LINKS.pc3; }
+document.getElementById('playNow').href = PLATFORM;
+document.getElementById('playNowDock').href = PLATFORM;
+document.getElementById('playNowModal').href = PLATFORM;
+
+/* ===== Utilidades ===== */
+const money = n => "$"+n.toLocaleString("es-AR");
+const whatsappText = v => `Hola, gané ${money(v)} en el juego de cofres y quiero reclamarlo con mi próxima carga.`;
+function todayKey(){ const n=new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}` }
+
+/* ===== Elementos ===== */
+const board = document.getElementById('board');
+const badge = document.getElementById('badge');
+const title = document.getElementById('title');
+const subtitle = document.getElementById('subtitle');
+const claimBtn = document.getElementById('claimBtn');
+const claimBtnDock = document.getElementById('claimBtnDock');
+const claimBtnModal = document.getElementById('claimBtnModal');
+
+/* ===== Crear cofres ===== */
+function chestHTML(idx){
+  return `
+    <div class="chest" data-index="${idx}">
+      <span class="rivet tl"></span><span class="rivet tr"></span>
+      <span class="rivet bl"></span><span class="rivet br"></span>
+      <span class="rivet b1l"></span><span class="rivet b1r"></span>
+      <span class="rivet b2l"></span><span class="rivet b2r"></span>
+      <div class="lock"></div>
+      <div class="prize">${money(PRIZES[idx])}</div>
+    </div>`;
+}
+board.innerHTML = PRIZES.map((_,i)=>chestHTML(i)).join("");
+
+/* ===== Estado diario ===== */
+function restoreDaily(){
+  const today = todayKey();
+  const storedDay = localStorage.getItem('cofre_date');
+  if(storedDay && storedDay !== today){
+    localStorage.removeItem('cofre_done');
+    localStorage.removeItem('cofre_prize');
+    localStorage.setItem('cofre_date', today);
+  } else if(!storedDay){
+    localStorage.setItem('cofre_date', today);
+  }
+}
+function restorePrizeIfAny(){
+  const done = localStorage.getItem('cofre_done')==='1';
+  const saved = localStorage.getItem('cofre_prize');
+  if(done && saved){
+    const v = parseInt(saved,10);
+    decorateWin(v);
+    enableClaim(v);
+  }
+}
+restoreDaily(); restorePrizeIfAny();
+
+/* ===== Abrir cofre ===== */
+let opening=false;
+board.addEventListener('click', e=>{
+  const el = e.target.closest('.chest');
+  if(!el || opening) return;
+
+  if(localStorage.getItem('cofre_done')==='1'){
+    showModal(parseInt(localStorage.getItem('cofre_prize'),10)); return;
+  }
+
+  opening=true;
+  el.classList.add('open'); // etiqueta aparece y candado se oculta
+
+  const value = PRIZES[+el.dataset.index];
+
+  setTimeout(()=>{
+    decorateWin(value);
+    enableClaim(value);
+    localStorage.setItem('cofre_done','1');
+    localStorage.setItem('cofre_prize', String(value));
+    showModal(value);
+    opening=false;
+  }, 350);
+});
+
+/* ===== UI: ganador en panel ===== */
+function decorateWin(value){
+  badge.textContent = money(value);
+  title.textContent = "🎉 ¡Premio obtenido!";
+  subtitle.innerHTML = `Recibís <b>${money(value)} extra</b> con tu próxima carga.`;
+}
+
+/* ===== Habilitar reclamar ===== */
+function enableClaim(value){
+  const url = `https://wa.me/${WP}?text=${encodeURIComponent(whatsappText(value))}`;
+  claimBtn.disabled=false; claimBtn.onclick=()=>location.href=url;
+  claimBtnDock.disabled=false; claimBtnDock.onclick=()=>location.href=url;
+  claimBtnModal.onclick=()=>location.href=url;
+}
+
+/* ===== Modal con confetti ===== */
+const modal = document.getElementById('winModal');
+const confetti = document.getElementById('confetti');
+const winAmount = document.getElementById('winAmount');
+const winText = document.getElementById('winText');
+document.getElementById('closeModal').addEventListener('click', ()=> modal.classList.remove('show'));
+modal.addEventListener('click', (e)=>{ if(e.target.classList.contains('backdrop')) modal.classList.remove('show') });
+
+function showModal(value){
+  winAmount.textContent = money(value);
+  winText.innerHTML = `¡Felicitaciones! Sumás <b>${money(value)}</b> en tu próxima carga.`;
+  spawnConfetti();
+  modal.classList.add('show');
+  setTimeout(()=>cleanupConfetti(), 2000);
+}
+function spawnConfetti(){
+  cleanupConfetti();
+  const colors = ['#ffd166','#ff9e2a','#7dd3fc','#a78bfa','#34d399','#f472b6','#e5e7eb'];
+  for(let i=0;i<80;i++){
+    const p = document.createElement('i');
+    const size = 6 + Math.random()*8;
+    p.style.left = Math.random()*100 + '%';
+    p.style.width = size + 'px';
+    p.style.height = (size*1.6) + 'px';
+    p.style.background = colors[i % colors.length];
+    p.style.transform = `translateY(-120px) rotate(${Math.random()*180}deg)`;
+    p.style.animation = `fall ${1.2 + Math.random()*1.2}s linear forwards`;
+    p.style.opacity = .9;
+    p.style.borderRadius = '2px';
+    confetti.appendChild(p);
+  }
+}
+function cleanupConfetti(){ confetti.innerHTML=''; }
+
+/* ===== Contador a fin de día ===== */
+const countdownEl = document.getElementById('countdown');
+function endOfDay(){
+  const n=new Date();
+  const end=new Date(n.getFullYear(), n.getMonth(), n.getDate(), 23, 59, 0, 0).getTime();
+  return end > Date.now() ? end : new Date(n.getFullYear(), n.getMonth(), n.getDate()+1, 23, 59, 0, 0).getTime();
+}
+function tickCountdown(){
+  const ms = endOfDay() - Date.now();
+  const total = Math.max(0, Math.floor(ms/1000));
+  const h = Math.floor(total/3600), m = Math.floor((total%3600)/60), s = total%60;
+  countdownEl.textContent = h>0 ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}` : `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+tickCountdown(); setInterval(tickCountdown, 1000);
+</script>
+</body>
+</html>

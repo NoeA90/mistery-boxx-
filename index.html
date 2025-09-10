@@ -178,14 +178,18 @@ h1,h2,h3,p{margin:0 0 8px} h1{font-size:26px} .muted{color:var(--muted)}
 .confetti i{position:absolute;top:-10px;width:10px;height:16px;opacity:.9;transform:translateY(-120px) rotate(0deg)}
 @keyframes fall{ to { transform: translateY(120vh) rotate(360deg) } }
 
-/* Watermark del código antifraude */
-#wmCode{
-  position:fixed;left:0;right:0;bottom:78px;z-index:60;
-  display:grid;place-items:center;pointer-events:none;
+/* ===== Watermarks visibles: Código + Fecha/Hora ===== */
+#wmCode, #wmTime{
+  position:fixed;left:0;right:0;z-index:60;display:grid;place-items:center;pointer-events:none;
   font:700 18px system-ui;color:#ffe27a;text-shadow:0 2px 8px rgba(0,0,0,.65);
-  opacity:.95
+  opacity:.98
 }
-@media (min-width:981px){#wmCode{bottom:22px}}
+#wmCode{ bottom:78px }
+#wmTime{ bottom:48px }
+@media (min-width:981px){
+  #wmCode{ bottom:22px }
+  #wmTime{ bottom:-6px }
+}
 </style>
 </head>
 <body>
@@ -254,6 +258,10 @@ h1,h2,h3,p{margin:0 0 8px} h1{font-size:26px} .muted{color:var(--muted)}
   </div>
 </div>
 
+<!-- Watermarks -->
+<div id="wmCode" aria-hidden="true" style="display:none"></div>
+<div id="wmTime" aria-hidden="true" style="display:none"></div>
+
 <script>
 /* ===== Premios (6 montos) ===== */
 const PRIZES = [2000, 3000, 4000, 5000, 7000, 10000];
@@ -274,9 +282,14 @@ document.getElementById('playNowModal').href = PLATFORM;
 /* ===== Utilidades ===== */
 const money = n => "$"+n.toLocaleString("es-AR");
 function todayKey(){ const n=new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}` }
+const fmt2 = n => String(n).padStart(2,'0');
+function nowStamp(){
+  const d = new Date();
+  return `${fmt2(d.getDate())}/${fmt2(d.getMonth()+1)}/${d.getFullYear()} · ${fmt2(d.getHours())}:${fmt2(d.getMinutes())}:${fmt2(d.getSeconds())}`;
+}
 
-/* ===== ANTIFRAUDE: código único por premio ===== */
-const SALT = "bet300-cofres-green-v1"; // podés cambiarlo periódicamente
+/* ===== ANTIFRAUDE: código + fecha/hora visibles ===== */
+const SALT = "bet300-cofres-green-v1"; // podés rotarlo cada tanto
 function ensureDeviceId(){
   let id = localStorage.getItem('device_id');
   if(!id){ id = (crypto.randomUUID?crypto.randomUUID(): (Date.now()+"-"+Math.random())); localStorage.setItem('device_id', id); }
@@ -287,23 +300,20 @@ async function sha256hex(msg){
   const buf = await crypto.subtle.digest("SHA-256", enc);
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
 }
-async function makeClaimCode(prizeLabel){
+async function makeClaimCode(prizeLabel, ts){
   const device = ensureDeviceId();
-  const base = `${device}|${todayKey()}|${prizeLabel}|${SALT}`;
+  const base = `${device}|${todayKey()}|${prizeLabel}|${ts}|${SALT}`;
   const hex = await sha256hex(base);
   return hex.slice(0,10).toUpperCase();
 }
-function showClaimWatermark(code){
-  let wm = document.getElementById('wmCode');
-  if(!wm){
-    wm = document.createElement('div');
-    wm.id = 'wmCode';
-    document.body.appendChild(wm);
-  }
-  wm.textContent = `Código de reclamo: ${code}`;
+function setWatermarkText(el, text){
+  el.textContent = text;
+  el.style.display = 'grid';
 }
-function whatsappTextWithCode(v, code){
-  return `Hola BET300, gané ${money(v)} en los cofres y quiero reclamarlo con mi próxima carga. Código: ${code}`;
+function whatsappTextWithMeta(v, code, ts){
+  // el código puede omitirse si decidís dejarlo de lado: poné "" en 'code'
+  const codePart = code ? ` Código: ${code}.` : "";
+  return `Hola BET300, gané ${money(v)} en los cofres y quiero reclamarlo con mi próxima carga.${codePart} Fecha y hora: ${ts}.`;
 }
 
 /* ===== Elementos ===== */
@@ -314,6 +324,8 @@ const subtitle = document.getElementById('subtitle');
 const claimBtn = document.getElementById('claimBtn');
 const claimBtnDock = document.getElementById('claimBtnDock');
 const claimBtnModal = document.getElementById('claimBtnModal');
+const wmCodeEl = document.getElementById('wmCode');
+const wmTimeEl = document.getElementById('wmTime');
 
 /* ===== Crear cofres ===== */
 function chestHTML(idx){
@@ -337,6 +349,7 @@ function restoreDaily(){
     localStorage.removeItem('cofre_done');
     localStorage.removeItem('cofre_prize');
     localStorage.removeItem('cofre_code');
+    localStorage.removeItem('cofre_time');
     localStorage.setItem('cofre_date', today);
   } else if(!storedDay){
     localStorage.setItem('cofre_date', today);
@@ -345,12 +358,14 @@ function restoreDaily(){
 function restorePrizeIfAny(){
   const done = localStorage.getItem('cofre_done')==='1';
   const saved = localStorage.getItem('cofre_prize');
+  const savedTs = localStorage.getItem('cofre_time');
+  const savedCode = localStorage.getItem('cofre_code') || '';
   if(done && saved){
     const v = parseInt(saved,10);
-    const code = localStorage.getItem('cofre_code') || '—';
     decorateWin(v);
-    enableClaim(v, code);
-    showClaimWatermark(code);
+    if(savedTs){ setWatermarkText(wmTimeEl, `Fecha y hora: ${savedTs}`); }
+    if(savedCode){ setWatermarkText(wmCodeEl, `Código de reclamo: ${savedCode}`); }
+    enableClaim(v, savedCode, savedTs || nowStamp());
   }
 }
 restoreDaily(); restorePrizeIfAny();
@@ -362,9 +377,13 @@ board.addEventListener('click', async e=>{
   if(!el || opening) return;
 
   if(localStorage.getItem('cofre_done')==='1'){
-    showModal(parseInt(localStorage.getItem('cofre_prize'),10)); 
-    const code = localStorage.getItem('cofre_code');
-    if(code) showClaimWatermark(code);
+    // ya hay premio: mostrar overlays persistidos
+    const v = parseInt(localStorage.getItem('cofre_prize')||'0',10);
+    const ts = localStorage.getItem('cofre_time') || nowStamp();
+    const code = localStorage.getItem('cofre_code') || '';
+    if(ts) setWatermarkText(wmTimeEl, `Fecha y hora: ${ts}`);
+    if(code) setWatermarkText(wmCodeEl, `Código de reclamo: ${code}`);
+    showModal(v);
     return;
   }
 
@@ -376,12 +395,19 @@ board.addEventListener('click', async e=>{
   setTimeout(async ()=>{
     decorateWin(value);
 
-    // generar código antifraude
-    const code = await makeClaimCode(money(value));
-    localStorage.setItem('cofre_code', code);
-    showClaimWatermark(code);
+    // 1) “congelamos” timestamp
+    const ts = nowStamp();
+    localStorage.setItem('cofre_time', ts);
+    setWatermarkText(wmTimeEl, `Fecha y hora: ${ts}`);
 
-    enableClaim(value, code);
+    // 2) código (podés dejar code="" si decidís no usarlo)
+    const code = await makeClaimCode(money(value), ts);
+    localStorage.setItem('cofre_code', code);
+    setWatermarkText(wmCodeEl, `Código de reclamo: ${code}`);
+
+    // 3) claim con meta
+    enableClaim(value, code, ts);
+
     localStorage.setItem('cofre_done','1');
     localStorage.setItem('cofre_prize', String(value));
     showModal(value);
@@ -396,16 +422,16 @@ function decorateWin(value){
   subtitle.innerHTML = `Recibís <b>${money(value)} extra</b> con tu próxima carga.`;
 }
 
-/* ===== Habilitar reclamar (con código) ===== */
-function enableClaim(value, code){
-  const text = whatsappTextWithCode(value, code);
+/* ===== Habilitar reclamar (con meta) ===== */
+function enableClaim(value, code, ts){
+  const text = whatsappTextWithMeta(value, code, ts);
   const url = `https://wa.me/${WP}?text=${encodeURIComponent(text)}`;
   claimBtn.disabled=false; claimBtn.onclick=()=>location.href=url;
   claimBtnDock.disabled=false; claimBtnDock.onclick=()=>location.href=url;
   claimBtnModal.onclick=()=>location.href=url;
 }
 
-/* ===== Modal con confetti ===== */
+/* ===== Modal / confetti ===== */
 const modal = document.getElementById('winModal');
 const confetti = document.getElementById('confetti');
 const winAmount = document.getElementById('winAmount');
@@ -456,4 +482,3 @@ tickCountdown(); setInterval(tickCountdown, 1000);
 </script>
 </body>
 </html>
-

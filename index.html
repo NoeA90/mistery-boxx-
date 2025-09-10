@@ -171,12 +171,21 @@ h1,h2,h3,p{margin:0 0 8px} h1{font-size:26px} .muted{color:var(--muted)}
 .winMsg{color:var(--muted);margin-bottom:14px}
 .modal .row{display:flex;gap:10px}
 .modal .row .btn{flex:1}
-.modal .closeX{position:absolute;right:10px;top:10px;background:transparent;border:none;color:var(--muted);font-size:22px;cursor:pointer}
+.modal .closeX{position:absolute;right:10px;top:10px;background:transparent;border:none;color:#aaa;font-size:22px;cursor:pointer}
 
 /* Confetti */
 .confetti{pointer-events:none;position:absolute;inset:0;overflow:hidden;border-radius:20px}
 .confetti i{position:absolute;top:-10px;width:10px;height:16px;opacity:.9;transform:translateY(-120px) rotate(0deg)}
 @keyframes fall{ to { transform: translateY(120vh) rotate(360deg) } }
+
+/* Watermark del código antifraude */
+#wmCode{
+  position:fixed;left:0;right:0;bottom:78px;z-index:60;
+  display:grid;place-items:center;pointer-events:none;
+  font:700 18px system-ui;color:#ffe27a;text-shadow:0 2px 8px rgba(0,0,0,.65);
+  opacity:.95
+}
+@media (min-width:981px){#wmCode{bottom:22px}}
 </style>
 </head>
 <body>
@@ -264,8 +273,38 @@ document.getElementById('playNowModal').href = PLATFORM;
 
 /* ===== Utilidades ===== */
 const money = n => "$"+n.toLocaleString("es-AR");
-const whatsappText = v => `Hola BET300, gané ${money(v)} en el juego de cofres y quiero reclamarlo con mi próxima carga.`;
 function todayKey(){ const n=new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}` }
+
+/* ===== ANTIFRAUDE: código único por premio ===== */
+const SALT = "bet300-cofres-green-v1"; // podés cambiarlo periódicamente
+function ensureDeviceId(){
+  let id = localStorage.getItem('device_id');
+  if(!id){ id = (crypto.randomUUID?crypto.randomUUID(): (Date.now()+"-"+Math.random())); localStorage.setItem('device_id', id); }
+  return id;
+}
+async function sha256hex(msg){
+  const enc = new TextEncoder().encode(msg);
+  const buf = await crypto.subtle.digest("SHA-256", enc);
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+async function makeClaimCode(prizeLabel){
+  const device = ensureDeviceId();
+  const base = `${device}|${todayKey()}|${prizeLabel}|${SALT}`;
+  const hex = await sha256hex(base);
+  return hex.slice(0,10).toUpperCase();
+}
+function showClaimWatermark(code){
+  let wm = document.getElementById('wmCode');
+  if(!wm){
+    wm = document.createElement('div');
+    wm.id = 'wmCode';
+    document.body.appendChild(wm);
+  }
+  wm.textContent = `Código de reclamo: ${code}`;
+}
+function whatsappTextWithCode(v, code){
+  return `Hola BET300, gané ${money(v)} en los cofres y quiero reclamarlo con mi próxima carga. Código: ${code}`;
+}
 
 /* ===== Elementos ===== */
 const board = document.getElementById('board');
@@ -297,6 +336,7 @@ function restoreDaily(){
   if(storedDay && storedDay !== today){
     localStorage.removeItem('cofre_done');
     localStorage.removeItem('cofre_prize');
+    localStorage.removeItem('cofre_code');
     localStorage.setItem('cofre_date', today);
   } else if(!storedDay){
     localStorage.setItem('cofre_date', today);
@@ -307,30 +347,41 @@ function restorePrizeIfAny(){
   const saved = localStorage.getItem('cofre_prize');
   if(done && saved){
     const v = parseInt(saved,10);
+    const code = localStorage.getItem('cofre_code') || '—';
     decorateWin(v);
-    enableClaim(v);
+    enableClaim(v, code);
+    showClaimWatermark(code);
   }
 }
 restoreDaily(); restorePrizeIfAny();
 
 /* ===== Abrir cofre ===== */
 let opening=false;
-board.addEventListener('click', e=>{
+board.addEventListener('click', async e=>{
   const el = e.target.closest('.chest');
   if(!el || opening) return;
 
   if(localStorage.getItem('cofre_done')==='1'){
-    showModal(parseInt(localStorage.getItem('cofre_prize'),10)); return;
+    showModal(parseInt(localStorage.getItem('cofre_prize'),10)); 
+    const code = localStorage.getItem('cofre_code');
+    if(code) showClaimWatermark(code);
+    return;
   }
 
   opening=true;
-  el.classList.add('open'); // etiqueta aparece y candado se oculta
+  el.classList.add('open');
 
   const value = PRIZES[+el.dataset.index];
 
-  setTimeout(()=>{
+  setTimeout(async ()=>{
     decorateWin(value);
-    enableClaim(value);
+
+    // generar código antifraude
+    const code = await makeClaimCode(money(value));
+    localStorage.setItem('cofre_code', code);
+    showClaimWatermark(code);
+
+    enableClaim(value, code);
     localStorage.setItem('cofre_done','1');
     localStorage.setItem('cofre_prize', String(value));
     showModal(value);
@@ -345,9 +396,10 @@ function decorateWin(value){
   subtitle.innerHTML = `Recibís <b>${money(value)} extra</b> con tu próxima carga.`;
 }
 
-/* ===== Habilitar reclamar ===== */
-function enableClaim(value){
-  const url = `https://wa.me/${WP}?text=${encodeURIComponent(whatsappText(value))}`;
+/* ===== Habilitar reclamar (con código) ===== */
+function enableClaim(value, code){
+  const text = whatsappTextWithCode(value, code);
+  const url = `https://wa.me/${WP}?text=${encodeURIComponent(text)}`;
   claimBtn.disabled=false; claimBtn.onclick=()=>location.href=url;
   claimBtnDock.disabled=false; claimBtnDock.onclick=()=>location.href=url;
   claimBtnModal.onclick=()=>location.href=url;
@@ -404,3 +456,4 @@ tickCountdown(); setInterval(tickCountdown, 1000);
 </script>
 </body>
 </html>
+
